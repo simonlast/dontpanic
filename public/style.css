@@ -1,0 +1,11 @@
+body {
+  background-color: #d0ffd0;
+  font-family: "Helvetica", sans-serif;
+  overflow: hidden;
+  color: #646464;
+  margin: 0;
+}
+#pongCanvas {
+  padding: 0px;
+  margin: 0px auto;
+}
