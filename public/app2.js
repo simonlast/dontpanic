@@ -6,7 +6,7 @@ var play = function(pjs) {
 	var bkg = pjs.color(208,259,208);
 
 	var numPoints = 10;
-	var accel = .22;
+	var accel = .3;
 	var opponentAccel;
 
 	var maxLinearVeloc = 5.0;
@@ -29,6 +29,7 @@ var play = function(pjs) {
 
 	var players = [];
 	var currRendered = [];
+	var eaten = []
 
 
 	var started = false;
@@ -52,7 +53,8 @@ var play = function(pjs) {
 		opponentAccel = .15;
 
 		players = [];
-		currRendered = []
+		currRendered = [];
+		eaten = []
 
 		for(var i=0; i<1100; i++){
 			var newBlob = new pjs.Blob(pjs.random(-10*pjs.width,10*pjs.width),
@@ -67,13 +69,25 @@ var play = function(pjs) {
 	}
 
 	pjs.draw = function(){
-			
+
 		pjs.pushMatrix();
 		pjs.translate(pjs.width/2-player.pos.x,pjs.height/2-player.pos.y)
 
 		pjs.background(bkg);
 
 		currRendered = [];
+
+		for(var i=0; i<eaten.length; i++){
+
+			var now = Date.now();
+			if(now - eaten[i].lastBreath < 1500){
+				eaten[i].eatenRender();
+			}else{
+				eaten.splice(i,1);
+				console.log(eaten.length);
+			}
+			
+		}
 
 		for(var i=0; i<players.length; i++){
 
@@ -88,8 +102,59 @@ var play = function(pjs) {
 
 		if(!started){
 			pjs.displayTitle();
-		}else{
-			pjs.updatePlayer();
+		}
+
+	};
+
+	pjs.keyPressed = function(){
+
+		var tNow = Date.now();
+
+		var key = pjs.keyCode;
+		keyNow = true;
+
+		if(key == 82){
+			this.setup();
+		}
+
+		if(tNow - lastPressed >= delta + player.rad*3){
+
+			lastPressed = tNow;
+
+			computePoints = true;
+			
+
+			// left
+			if(key == 37){
+				player.a.x -= accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(1,0));
+			}
+			if(key == 40){ // down
+				player.a.y += accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(0,-1));
+			}
+			if(key == 39){ // right
+				player.a.x += accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(-1,0));
+			}
+			if(key == 38){ // up
+				player.a.y -= accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(0,1));
+			}
+
+			//try to eat other cells
+			player.affect(affectAmount + affectAmount*10/player.rad);
+
+		}
+
+
+	};
+
+	pjs.keyReleased = function(){
+		keyNow = false;
+		for(var i=0; i<player.points.length; i++){
+				var curr = player.points[i];
+				curr.a = new pjs.PVector();
 		}
 
 	};
@@ -97,32 +162,23 @@ var play = function(pjs) {
 	pjs.mousePressed = function(){
 		if(!started){
 			started = true;
-		}else{
-			pjs.updatePlayer();
 		}
 	};
 
 	pjs.updatePlayer = function(){
 
-		var tNow = Date.now();
+		var mouse = new pjs.PVector(pjs.mouseX,pjs.mouseY);
+		var diff = pjs.PVector.sub(mouse, player.pos);
+		diff.normalize();
+		var angle = -1*pjs.atan(diff.y/diff.x);
 
-		if(tNow - lastPressed >= delta + player.rad*3){
+		pjs.line(player.pos.x,player.pos.y,player.pos.x+diff.x*10,
+			player.pos.y + diff.y * 10);
 
-			lastPressed = tNow;
-
-			var mouse = new pjs.PVector(pjs.mouseX-(pjs.width/2-player.pos.x),
-				pjs.mouseY-(pjs.height/2-player.pos.y));
-			var diff = pjs.PVector.sub(mouse, player.pos);
-			diff.normalize();
-			var angle = -1*pjs.atan(diff.y/diff.x);
-
-			var diff2 = new pjs.PVector(diff.x*accel,diff.y*accel);
-			diff.mult(-1);
-			player.a.add(diff2);
-			player.expandDir(expandDirAmount,diff);
-
-			player.affect(affectAmount + affectAmount*10/player.rad);
-		}
+		var diff2 = new pjs.PVector(diff.x*accel,diff.y*accel);
+		diff.mult(-1);
+		player.a.add(diff2);
+		player.expandDir(expandDirAmount,diff);
 
 	};
 	
@@ -137,7 +193,7 @@ var play = function(pjs) {
 		pjs.textFont(f,pjs.width/12);
 		pjs.text("you're alive.",pjs.width/2,pjs.height*3/4);
 		pjs.textFont(f,pjs.width/40);
-		pjs.text("(click to start - use your mouse)",pjs.width/2,pjs.height-60);
+		pjs.text("(click to start - use the arrow keys)",pjs.width/2,pjs.height-60);
 
 	};
 
@@ -151,6 +207,7 @@ var play = function(pjs) {
 		var angle = 0;
 		this.index = index;
 		this.lastBreath = Date.now();
+		this.eaten = false;
 
 		for(var i=0; i<numPoints; i++){
 			angle += 2*Math.PI/numPoints;
@@ -218,6 +275,33 @@ var play = function(pjs) {
 				
 		};
 
+		this.staticRender = function(){
+			pjs.fill(this.c,172);
+			pjs.stroke(this.c,172);
+			pjs.strokeWeight(12);
+			pjs.beginShape();
+
+			for(var i=0; i<this.points.length; i++){
+				var curr = this.points[i];
+				curr.render();
+
+			}
+
+			for(var i=0; i<3; i++){
+				var curr = this.points[i];
+				pjs.curveVertex(this.pos.x + curr.pos.x,this.pos.y + curr.pos.y);
+			}
+
+			
+
+			pjs.endShape();
+
+			pjs.strokeWeight(8);
+			pjs.fill(this.c,100);
+			pjs.ellipse(this.pos.x,this.pos.y,this.rad/2 + this.nucleus.x,
+				this.rad/2 + this.nucleus.y);
+		}
+
 		this.autoRender = function(){
 
 			if(pjs.abs(player.pos.x - this.pos.x) > pjs.width/2 + this.rad + 300
@@ -243,16 +327,31 @@ var play = function(pjs) {
 			this.render();
 		}
 
+		this.eatenRender = function(){
+
+			for(var i=0; i<this.points.length; i++){
+				var curr = this.points[i];
+				curr.orig.mult(.95);
+			}
+
+
+			this.render();
+
+		}
+
 
 		//placeholder for future opponent behavior
 		this.act = function(){
+
+			if(this.eaten)
+				return;
 
 			var cell;
 			var min = 1e9;
 			//find nearest cell
 			for(var i=0; i<currRendered.length; i++){
 				var curr = currRendered[i];
-				if(curr != this){
+				if(curr != this && !curr.eaten){
 					var dist = pjs.PVector.dist(this.pos,curr.pos);
 					if(dist < min){
 						min = dist;
@@ -321,8 +420,8 @@ var play = function(pjs) {
 					% Math.PI*2 - Math.PI);
 				//console.log(angle + ": " + curr.angle + ", " + currWeight);
 				currWeight *= 2.0;
-				curr.a.add(new pjs.PVector((dir.x/2 + curr.dirV.x)*currWeight*accel,
-					(dir.y/2 + curr.dirV.y)*currWeight*accel));
+				curr.a = new pjs.PVector((dir.x/2 + curr.dirV.x)*currWeight*accel,
+					(dir.y/2 + curr.dirV.y)*currWeight*accel);
 
 			}	
 		};
@@ -362,7 +461,7 @@ var play = function(pjs) {
 
 					if(dist < this.rad){
 						this.eat(curr);
-						//opponentAccel+= opponentAccel/20;
+						opponentAccel+= opponentAccel/20;
 					}
 
 					dist /= pjs.width;
@@ -415,15 +514,26 @@ var play = function(pjs) {
 				return;
 			}
 
-			this.expand(.5);
+			console.log(this);
+			//blob.pos = this.pos;
+			blob.eaten = true;
+			//blob.a = new pjs.PVector(this.a);
+			//blob.v = new pjs.PVector(this.v);
+			blob.pos = this.pos;
+			blob.lastBreath = Date.now();
+
+			for(var i=0; i<blob.points.length; i++){
+				blob.points[i].orig = this.points[i].orig;
+			}
+
+			eaten.push(blob);
 
 			players.splice(blob.index,1);
 
-			/*players.push(new pjs.Blob(pjs.random(-10*pjs.width,10*pjs.width),
+			players.push(new pjs.Blob(pjs.random(-10*pjs.width,10*pjs.width),
 				pjs.random(-10*pjs.height,10*pjs.height),
 				pjs.random(30,150), 
 				pjs.color(pjs.random(100,220),pjs.random(100,220),pjs.random(100,220)),i));
-			*/
 
 			for(var i=0; i<players.length; i++){
 				players[i].index = i;
@@ -488,4 +598,58 @@ var canvas = document.getElementById("bioCanvas");
 var processingInstance = new Processing(canvas, play);
 processingInstance.externals.sketch.options.pauseOnBlur = true;
 processingInstance.externals.sketch.options.globalKeyEvents = true;
+
+	/*pjs.keyPressed = function(){
+
+		var tNow = Date.now();
+
+		var key = pjs.keyCode;
+		keyNow = true;
+
+		if(key == 82){
+			this.setup();
+		}
+
+		if(tNow - lastPressed >= delta + player.rad*3){
+
+			lastPressed = tNow;
+
+			computePoints = true;
+			
+
+			// left
+			if(key == 37){
+				player.a.x -= accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(1,0));
+			}
+			if(key == 40){ // down
+				player.a.y += accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(0,-1));
+			}
+			if(key == 39){ // right
+				player.a.x += accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(-1,0));
+			}
+			if(key == 38){ // up
+				player.a.y -= accel;
+				player.expandDir(expandDirAmount,new pjs.PVector(0,1));
+			}
+
+			//try to eat other cells
+			player.affect(affectAmount + affectAmount*10/player.rad);
+
+		}
+
+
+	};
+
+	pjs.keyReleased = function(){
+		keyNow = false;
+		for(var i=0; i<player.points.length; i++){
+				var curr = player.points[i];
+				curr.a = new pjs.PVector();
+		}
+
+	};*/
+
 
