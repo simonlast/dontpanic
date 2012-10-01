@@ -6,7 +6,7 @@ var play = function(pjs) {
 	var bkg = pjs.color(208,259,208);
 
 	var numPoints = 10;
-	var accel = .22;
+	var playerAccel = .22;
 	var opponentAccel;
 
 	var maxLinearVeloc = 5.0;
@@ -30,6 +30,8 @@ var play = function(pjs) {
 	var players = [];
 	var currRendered = [];
 
+	var translated;
+
 
 	var started = false;
 
@@ -51,13 +53,15 @@ var play = function(pjs) {
 
 		opponentAccel = .15;
 
+		translated = new pjs.PVector(pjs.width/2,pjs.height/2);
+
 		players = [];
 		currRendered = []
 
 		for(var i=0; i<1100; i++){
 			var newBlob = new pjs.Blob(pjs.random(-10*pjs.width,10*pjs.width),
 				pjs.random(-10*pjs.height,10*pjs.height),
-				pjs.random(30,150), 
+				pjs.random(30,135), 
 				pjs.color(pjs.random(100,220),pjs.random(100,220),pjs.random(100,220)),i);
 			if(pjs.PVector.dist(player.pos,newBlob.pos) > pjs.width/3)
 				players.push(newBlob);
@@ -67,9 +71,12 @@ var play = function(pjs) {
 	}
 
 	pjs.draw = function(){
-			
+		
+		player.adjustTranslation();
+
 		pjs.pushMatrix();
-		pjs.translate(pjs.width/2-player.pos.x,pjs.height/2-player.pos.y)
+		//pjs.translate(pjs.width/2-player.pos.x,pjs.height/2-player.pos.y)
+		pjs.translate(translated.x,translated.y);
 
 		pjs.background(bkg);
 
@@ -110,13 +117,13 @@ var play = function(pjs) {
 
 			lastPressed = tNow;
 
-			var mouse = new pjs.PVector(pjs.mouseX-(pjs.width/2-player.pos.x),
-				pjs.mouseY-(pjs.height/2-player.pos.y));
+			var mouse = new pjs.PVector(pjs.mouseX-translated.x,
+				pjs.mouseY-translated.y);
 			var diff = pjs.PVector.sub(mouse, player.pos);
 			diff.normalize();
 			var angle = -1*pjs.atan(diff.y/diff.x);
 
-			var diff2 = new pjs.PVector(diff.x*accel,diff.y*accel);
+			var diff2 = new pjs.PVector(diff.x*playerAccel,diff.y*playerAccel);
 			diff.mult(-1);
 			player.a.add(diff2);
 			player.expandDir(expandDirAmount,diff);
@@ -241,6 +248,24 @@ var play = function(pjs) {
 			}
 
 			this.render();
+		}
+
+		this.adjustTranslation = function(){
+			var screenPos = new pjs.PVector(this.pos.x + translated.x,
+				this.pos.y + translated.y);
+			if(screenPos.x < pjs.width*1/3){
+				translated.x = pjs.width*1/3 - this.pos.x;
+			}else if(screenPos.x > pjs.width*2/3){
+				translated.x = pjs.width*2/3 - this.pos.x;
+			}
+
+			if(screenPos.y < pjs.height*1/3){
+				translated.y = pjs.height*1/3 - this.pos.y;
+			}else if(screenPos.y > pjs.height*2/3){
+				translated.y = pjs.height*2/3 - this.pos.y;
+			}
+
+
 		}
 
 
@@ -416,6 +441,17 @@ var play = function(pjs) {
 			}
 
 			this.expand(.5);
+
+			/*var r = pjs.red(this.c);
+			var g = pjs.green(this.c);
+			var b = pjs.blue(this.c);
+
+			var r2 = pjs.red(blob.c);
+			var g2 = pjs.green(blob.c);
+			var b2 = pjs.blue(blob.c);
+
+			this.c = pjs.color((r*9/10+r2/10),(g*9/10+g2/10),(b*9/10+b2/10));
+			*/
 
 			players.splice(blob.index,1);
 
